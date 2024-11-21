@@ -4,21 +4,22 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 import streamlit as st
 from tensorflow.keras.models import load_model
 
-# Set a custom title and description with HTML
+# Set up Streamlit app
 st.set_page_config(page_title="Dominant Dosha Predictor", layout="wide")
 st.title("💫 Dominant Dosha Prediction 💫")
 st.markdown("""
-    Welcome to the **Dominant Dosha Prediction** tool! 🙏
-    This tool helps you find out your dominant dosha based on a few simple questions.
-    **Answer the following survey questions**, and hit the **Predict** button to get your result! ✨
+    Welcome to the **Dominant Dosha Prediction** tool! 🙏  
+    Answer a few simple questions, and we'll help you discover your dominant dosha.  
+    **Select your responses in the sidebar and hit the Predict button!** ✨
 """)
 
+# Load the dataset for preprocessing reference
 file_url = 'https://raw.githubusercontent.com/Keerthivasan-11/SIDD/main/IMPORTANT%20VARIABLES.csv'
 
 # Read the CSV file from the raw URL
 data = pd.read_csv(file_url, encoding='latin')
 
-# Separate features and target
+# Preprocess data
 X = data.drop(columns=['Dominant_Dosha'])  # Replace 'Dominant_Dosha' with your actual target column name
 y = data['Dominant_Dosha']
 
@@ -38,11 +39,11 @@ y_encoded = label_encoder.fit_transform(y)
 # Get the number of features from the processed training data
 number_of_features = X.shape[1]
 
-# Sidebar for Survey Questions
+# Sidebar for survey questions
 st.sidebar.header("Survey Questions")
 survey_questions = {
     "BODY FRAME": ["Thin and unusually tall or short", "Medium body", "Large body"],
-    "TEETH ALIGNMENT": ["Crooked, uneven, buck teeth", "Med., even teeth, gums bleed easily", "Large, even, gleaming teeth"],
+    "TEETH ALIGNMENT": ["Crooked, uneven, buck teeth", "Medium, even teeth, gums bleed easily", "Large, even, gleaming teeth"],
     "WORK": ["Creative, spontaneous artist", "Organized thinker/leader", "Prefers to work under routine"],
     "WORK NATURE": [
         "Does many projects at once, prefers multitasking",
@@ -65,10 +66,14 @@ survey_questions = {
     ],
 }
 
+# Collect user responses
 user_responses = []
 for question, options in survey_questions.items():
-    choice = st.sidebar.radio(question, options)
-    user_responses.append(options.index(choice) + 1)
+    choice = st.sidebar.radio(f"{question} (Select one)", ["None selected"] + options, index=0)
+    if choice == "None selected":
+        user_responses.append(None)  # Track unanswered questions
+    else:
+        user_responses.append(options.index(choice) + 1)
 
 # Add a beautiful button with an icon
 button_style = """
@@ -89,38 +94,49 @@ button_style = """
 """
 st.markdown(button_style, unsafe_allow_html=True)
 
-# Button to trigger the prediction
+# Button to trigger prediction
 if st.button("✨ Predict Dominant Dosha ✨"):
-    # Preprocess user responses (convert to one-hot encoding)
-    user_input_encoded = []
-    for i, question in enumerate(survey_questions.keys()):
-        response_vector = [0] * 3  # Assuming 3 options for each question
-        response_vector[user_responses[i] - 1] = 1  # Set the chosen option to 1
-        user_input_encoded.extend(response_vector)
+    if None in user_responses:
+        st.warning("🚨 Please answer all questions before predicting your dominant dosha.")
+    else:
+        # Preprocess user responses (convert to one-hot encoding)
+        user_input_encoded = []
+        for i, question in enumerate(survey_questions.keys()):
+            response_vector = [0] * 3  # Assuming 3 options for each question
+            response_vector[user_responses[i] - 1] = 1  # Set the chosen option to 1
+            user_input_encoded.extend(response_vector)
 
-    # Convert to numpy array and reshape
-    user_input = np.array(user_input_encoded).reshape(1, -1)
+        # Convert to numpy array and reshape
+        user_input = np.array(user_input_encoded).reshape(1, -1)
 
-    # Ensure the input matches the expected number of features (pad if necessary)
-    if user_input.shape[1] < number_of_features:
-        padded_input = np.zeros((1, number_of_features))
-        padded_input[:, :user_input.shape[1]] = user_input
-        user_input = padded_input
+        # Ensure the input matches the expected number of features (pad if necessary)
+        if user_input.shape[1] < number_of_features:
+            padded_input = np.zeros((1, number_of_features))
+            padded_input[:, :user_input.shape[1]] = user_input
+            user_input = padded_input
 
-    # Reshape the input to match CNN's expected input shape (1, features, 1)
-    user_input = np.expand_dims(user_input, axis=2)
+        # Reshape the input to match CNN's expected input shape (1, features, 1)
+        user_input = np.expand_dims(user_input, axis=2)
 
-    # Load the trained model
-    model = load_model('dominant_dosha_cnn_model.h5')
+        # Load the trained model
+        model = load_model('dominant_dosha_cnn_model.h5')
 
-    # Make predictions
-    predictions = model.predict(user_input)
-    predicted_class = np.argmax(predictions, axis=1)
+        # Make predictions
+        predictions = model.predict(user_input)
+        predicted_class = np.argmax(predictions, axis=1)
 
-    # Decode the predicted class
-    class_labels = label_encoder.classes_
-    predicted_dosha = class_labels[predicted_class[0]]
+        # Decode the predicted class
+        class_labels = label_encoder.classes_
+        predicted_dosha = class_labels[predicted_class[0]]
 
-    # Output the result with a fancy heading and icon
-    st.markdown(f"### 🧘‍♂️ **Your Dominant Dosha is: {predicted_dosha}** 🧘‍♀️")
-    st.balloons()  # Add confetti balloons to celebrate!
+        # Output the result
+        st.markdown(f"### 🧘‍♂️ **Your Dominant Dosha is: {predicted_dosha}** 🧘‍♀️")
+        st.balloons()
+
+        # Add dietary suggestions
+        dosha_diet = {
+            "Vata": "Focus on warm, oily, and grounding foods like soups and stews. Avoid dry and raw foods.",
+            "Pitta": "Include cooling foods like milk, cucumbers, and sweet fruits. Avoid spicy and acidic foods.",
+            "Kapha": "Opt for light, warm, and spicy foods. Avoid heavy, oily, and sweet foods.",
+        }
+        st.markdown(f"#### Dietary Recommendation: {dosha_diet[predicted_dosha]}")
