@@ -13,9 +13,10 @@ st.markdown("""
     **Answer the following survey questions**, and hit the **Predict** button to get your result! ✨
 """)
 
-# Load the dataset for preprocessing reference
-file_path = '/content/IMPORTANT VARIABLES.csv'  # Replace with your file path
-data = pd.read_csv(file_path, encoding='latin')
+file_url = 'https://raw.githubusercontent.com/Keerthivasan-11/SIDD/main/IMPORTANT%20VARIABLES.csv'
+
+# Read the CSV file from the raw URL
+data = pd.read_csv(file_url, encoding='latin')
 
 # Separate features and target
 X = data.drop(columns=['Dominant_Dosha'])  # Replace 'Dominant_Dosha' with your actual target column name
